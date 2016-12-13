@@ -21,7 +21,7 @@ env:
     - NGX_BUILD_JOBS=$JOBS
     - TEST_NGINX_SLEEP=0.006
   matrix:
-    - NGINX_VERSION=1.9.15
+    - NGINX_VERSION=1.11.6
 
 services:
  - memcache
@@ -32,8 +32,8 @@ before_install:
 
 install:
   - git clone https://github.com/openresty/nginx-devel-utils.git
-  - git clone https://github.com/openresty/openresty.git ../openresty
-  - git clone https://github.com/openresty/no-pool-nginx.git ../no-pool-nginx
+  - git clone -b ngx-1.11.6 https://github.com/doujiang24/openresty.git ../openresty
+  - git clone -b ngx-1.11.6 https://github.com/doujiang24/no-pool-nginx.git ../no-pool-nginx
   - git clone https://github.com/simpl/ngx_devel_kit.git ../ndk-nginx-module
   - git clone https://github.com/openresty/mockeagain.git
   - git clone https://github.com/openresty/test-nginx.git
