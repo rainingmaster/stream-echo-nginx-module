@@ -83,6 +83,7 @@ struct ngx_stream_echo_ctx_s {
     ngx_stream_echo_filter_handler_pt        input_filter;
 
     size_t                                   rest;
+    ngx_int_t                                status;
 
     unsigned                                 discard_req:1;
     unsigned                                 writing_req:1;
@@ -1373,18 +1374,15 @@ ngx_stream_echo_finalize(ngx_stream_session_t *s, ngx_int_t rc)
     ngx_log_debug1(NGX_LOG_DEBUG_STREAM, c->log, 0,
                    "stream echo finalize: rc=%i", rc);
 
-    if (rc == NGX_ERROR || rc == NGX_DECLINED) {
-        ngx_stream_finalize_session(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
-        return;
-    }
-
     escf = ngx_stream_get_module_srv_conf(s, ngx_stream_echo_module);
 
     ctx = ngx_stream_get_module_ctx(s, ngx_stream_echo_module);
     if (ctx == NULL) {
-        ngx_stream_finalize_session(s, NGX_STREAM_OK);
+        ngx_stream_finalize_session(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
         return;
     }
+
+    ctx->status = rc;
 
     if (ctx->busy) { /* having pending data to be sent */
 
@@ -1440,6 +1438,7 @@ ngx_stream_echo_finalize(ngx_stream_session_t *s, ngx_int_t rc)
         return;
     }
 
+#if 0
     if (escf->lingering_close == NGX_STREAM_ECHO_LINGERING_ALWAYS
         || (escf->lingering_close == NGX_STREAM_ECHO_LINGERING_ON
             && ((ctx->buffer_in &&
@@ -1454,6 +1453,11 @@ ngx_stream_echo_finalize(ngx_stream_session_t *s, ngx_int_t rc)
     dd("closing connection upon successful completion");
 
     ngx_stream_finalize_session(s, NGX_STREAM_OK);
+    return;
+#endif
+
+    /* always linger close for now */
+    ngx_stream_echo_set_lingering_close(s, ctx);
     return;
 }
 
@@ -1521,19 +1525,20 @@ ngx_stream_echo_lingering_close_handler(ngx_event_t *rev)
     ngx_log_debug0(NGX_LOG_DEBUG_STREAM, c->log, 0,
                    "stream echo lingering close handler");
 
-    if (rev->timedout) {
+    ctx = ngx_stream_get_module_ctx(s, ngx_stream_echo_module);
+    if (ctx == NULL) {
         ngx_stream_finalize_session(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
         return;
     }
 
-    ctx = ngx_stream_get_module_ctx(s, ngx_stream_echo_module);
-    if (ctx == NULL) {
+    if (rev->timedout) {
+        ngx_stream_finalize_session(s, ctx->status);
         return;
     }
 
     timer = (ngx_msec_t) ctx->lingering_time - (ngx_msec_t) ngx_time();
     if ((ngx_msec_int_t) timer <= 0) {
-        ngx_stream_finalize_session(s, NGX_STREAM_OK);
+        ngx_stream_finalize_session(s, ctx->status);
         return;
     }
 
@@ -1544,7 +1549,7 @@ ngx_stream_echo_lingering_close_handler(ngx_event_t *rev)
                        "stream echo lingering read: %d", n);
 
         if (n == NGX_ERROR || n == 0) {
-            ngx_stream_finalize_session(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
+            ngx_stream_finalize_session(s, ctx->status);
             return;
         }
 
