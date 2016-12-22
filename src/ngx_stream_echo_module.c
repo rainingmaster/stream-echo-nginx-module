@@ -1374,6 +1374,11 @@ ngx_stream_echo_finalize(ngx_stream_session_t *s, ngx_int_t rc)
     ngx_log_debug1(NGX_LOG_DEBUG_STREAM, c->log, 0,
                    "stream echo finalize: rc=%i", rc);
 
+    if (rc == NGX_ERROR || rc == NGX_DECLINED) {
+        ngx_stream_finalize_session(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
+        return;
+    }
+
     escf = ngx_stream_get_module_srv_conf(s, ngx_stream_echo_module);
 
     ctx = ngx_stream_get_module_ctx(s, ngx_stream_echo_module);
@@ -1438,7 +1443,6 @@ ngx_stream_echo_finalize(ngx_stream_session_t *s, ngx_int_t rc)
         return;
     }
 
-#if 0
     if (escf->lingering_close == NGX_STREAM_ECHO_LINGERING_ALWAYS
         || (escf->lingering_close == NGX_STREAM_ECHO_LINGERING_ON
             && ((ctx->buffer_in &&
@@ -1453,11 +1457,6 @@ ngx_stream_echo_finalize(ngx_stream_session_t *s, ngx_int_t rc)
     dd("closing connection upon successful completion");
 
     ngx_stream_finalize_session(s, NGX_STREAM_OK);
-    return;
-#endif
-
-    /* always linger close for now */
-    ngx_stream_echo_set_lingering_close(s, ctx);
     return;
 }
 
